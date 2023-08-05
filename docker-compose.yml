@@ -1,0 +1,15 @@
+version: "3.7"
+services:
+  asx:
+    build: https://github.com/timmo-d/asx_db.git
+  db:
+    image: mysql
+    environment:
+      DB: asx_db
+      USER: "${USER}"
+    ports:
+      - "3306:33066"
+    networks:
+      - asx-app
+networks:
+  asx-app: {}

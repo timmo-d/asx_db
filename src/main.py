@@ -9,6 +9,12 @@ from sqlalchemy.exc import OperationalError
 
 
 def main():
+    """This function is the main function to run the program.
+
+    :returns:  Nil
+    :raises: None
+    """
+
     # establish connection to database server
     engine, connection, metadata = open_db_connection()
 
@@ -54,6 +60,12 @@ def main():
 
 
 def open_db_connection():
+    """This function establishes a database connection.
+
+    :returns:  engine, connection, metadata
+    :raises: None
+    """
+
     # engine = db.create_engine('dialect+driver://user:pass@host:port/db')
     try:
         engine = db.create_engine('sqlite:///asx_db.sqlite')
@@ -67,6 +79,15 @@ def open_db_connection():
 
 
 def create_tables(engine, connection, metadata):
+    """This function creates the necessary tables if they are not already created.
+
+    :param engine: database engine
+    :param connection: connection to database
+    :param metadata: schema metadata
+    :returns:  Nil
+    :raises: None
+    """
+
     # Check if Company table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'company'):
         Table('company', metadata,
@@ -126,7 +147,7 @@ def construct_url(ticker, s_date, e_date):
     """This function constructs the correct URL string to download from Yahoo Finance.
 
     :param ticker: company symbol
-    :type s_date: start date in epoch
+    :param s_date: start date in epoch
     :param e_date: end date in epoch
     :returns:  str -- URL for downloading from Yahoo Finance
     :raises: None
