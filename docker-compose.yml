@@ -2,12 +2,5 @@ version: "3.7"
 services:
   asx:
     build: https://github.com/timmo-d/asx_db.git
-  db:
-    image: mysql
-    environment:
-      DB: asx_db
-      USER: "${USER}"
-    networks:
-      - asx-app
 networks:
   asx-app: {}

@@ -6,7 +6,7 @@ import pandas as pd
 
 from sqlalchemy import Table, Column, Integer, Date, String, Float
 from sqlalchemy.exc import OperationalError
-
+from sqlalchemy_utils import database_exists, create_database
 
 def main():
     """This function is the main function to run the program.
@@ -17,10 +17,10 @@ def main():
 
     # establish connection to database server
     engine, connection, metadata = open_db_connection()
-
+    print('6')
     # Check if tables exists, if not, create them
     create_tables(engine, connection, metadata)
-
+    print('7')
     # get company list from Yahoo Finance
     company_url = 'https://www.asx.com.au/asx/research/ASXListedCompanies.csv'
     print("Getting companies on ASX.")
@@ -65,16 +65,30 @@ def open_db_connection():
     :returns:  engine, connection, metadata
     :raises: None
     """
-
+    db_addr = '192.168.1.106:3306'
+    # TODO create user from here and not in database directly
+    db_user = 'asx'
+    db_pass = 'asx'
+    db_name = 'asx'
     # engine = db.create_engine('dialect+driver://user:pass@host:port/db')
     try:
-        engine = db.create_engine('sqlite:///asx_db.sqlite')
+        #engine = db.create_engine('sqlite:///asx_db.sqlite')
+        url = f"mysql+pymysql://{db_user}:{db_pass}@{db_addr}/{db_name}"
+        print(url)
+        engine = db.create_engine(url, echo=False)
+        print('1')
+        if not database_exists(engine.url):
+            print('2')
+            create_database(engine.url)
+            print('3')
         connection = engine.connect()
+        print('4')
         metadata = db.MetaData()
         db.MetaData.reflect(metadata, bind=engine)
     except OperationalError as err:
         logging.error("Cannot connect to DB %s", err)
         raise err
+    print('5')
     return engine, connection, metadata
 
 
@@ -87,18 +101,20 @@ def create_tables(engine, connection, metadata):
     :returns:  Nil
     :raises: None
     """
-
+    print('a')
     # Check if Company table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'company'):
+        print('b')
         Table('company', metadata,
               Column('Id', Integer, primary_key=True, nullable=False),
-              Column('name', String),
-              Column('symbol', String),
-              Column('group', String),
+              Column('name', String(100)),
+              Column('symbol', String(5)),
+              Column('group', String(100)),
               )
+        print('c')
         # Implement the creation
         metadata.create_all(engine)
-
+        print('d')
     # Check if Stock_Price table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'stock_price'):
         Table('stock_price', metadata,
@@ -110,7 +126,7 @@ def create_tables(engine, connection, metadata):
               Column('close', Float),
               Column('adjclose', Float),
               Column('volume', Integer),
-              Column('symbol', String),
+              Column('symbol', String(5)),
               )
         # Implement the creation
         metadata.create_all(engine)
@@ -119,8 +135,8 @@ def create_tables(engine, connection, metadata):
     if not engine.dialect.has_table(connection, 'index'):
         Table('index', metadata,
               Column('Id', Integer, primary_key=True, nullable=False),
-              Column('name', String),
-              Column('symbol', String),
+              Column('name', String(100)),
+              Column('symbol', String(10)),
               Column('last_date', Date),
               )
         # Implement the creation
@@ -137,7 +153,7 @@ def create_tables(engine, connection, metadata):
               Column('close', Float),
               Column('adjclose', Float),
               Column('volume', Integer),
-              Column('symbol', String),
+              Column('symbol', String(5)),
               )
         # Implement the creation
         metadata.create_all(engine)

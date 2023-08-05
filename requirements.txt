@@ -1,3 +1,5 @@
 sqlalchemy
 pandas
 urllib3
+pymysql
+sqlalchemy-utils
