@@ -7,11 +7,8 @@ COPY . /opt/asx
 COPY crontab /etc/cron.d/crontab
 RUN chmod 0644 /etc/cron.d/crontab
 RUN /usr/bin/crontab /etc/cron.d/crontab
-COPY asx_db.sqlite asx_db.sqlite
-COPY src/constants.py constants.py
 COPY src/main.py main.py
 COPY README.md README.md
-COPY src/www.py www.py
 RUN echo $PYTHONPATH
 # run crond as main process of container
 CMD ["cron", "-f"]
