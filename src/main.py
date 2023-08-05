@@ -3,10 +3,13 @@ import time
 import logging
 import sqlalchemy as db
 import pandas as pd
+import io
+import requests
 
 from sqlalchemy import Table, Column, Integer, Date, String, Float
 from sqlalchemy.exc import OperationalError
 from sqlalchemy_utils import database_exists, create_database
+
 
 def main():
     """This function is the main function to run the program.
@@ -17,10 +20,10 @@ def main():
 
     # establish connection to database server
     engine, connection, metadata = open_db_connection()
-    print('6')
+
     # Check if tables exists, if not, create them
     create_tables(engine, connection, metadata)
-    print('7')
+
     # get company list from Yahoo Finance
     company_url = 'https://www.asx.com.au/asx/research/ASXListedCompanies.csv'
     print("Getting companies on ASX.")
@@ -47,15 +50,29 @@ def main():
 
         # get price data for that company between last date and yesterday from YFinance
         url = construct_url(str(ticker), str(last_date_epoch), str(current_date_epoch))
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) AppleWebKit/602.1.50 (KHTML, like Gecko) CriOS/56.0.2924.75 Mobile/14E5239e Safari/602.1 RuxitSynthetic/1.0 v1100525156 t4690183951324214268 smf=0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+            'Accept-Language': 'en-US,en;q=0.8',
+            'Accept-Encoding': 'none',
+            'Connection': 'keep-alive'}
+
         try:
-            print(str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url)
-            df_stock_prices = pd.read_csv(url, skiprows=1, names=['datestamp', 'open', 'high', 'low', 'close', 'adjclose', 'volume', 'symbol'])
-            df_stock_prices['symbol'] = ticker
-            df_stock_prices = df_stock_prices.reset_index(drop=True)
-            df_stock_prices.to_sql('stock_price', engine, if_exists='append', index=False)
+            response = requests.get(url, headers=headers)
+            print(str(response.status_code) + " | " + str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url)
+
+            if response.status_code == 200:
+                df_stock_prices = pd.read_csv(url, skiprows=1,
+                                              names=['datestamp', 'open', 'high', 'low', 'close', 'adjclose', 'volume',
+                                                     'symbol'])
+                df_stock_prices['symbol'] = ticker
+                df_stock_prices = df_stock_prices.reset_index(drop=True)
+                df_stock_prices.to_sql('stock_price', engine, if_exists='append', index=False)
         except OperationalError as err:
             logging.error("Failed to add %s to database %s", ticker, err)
-            raise err
+            print("Error downloading " + ticker)
+            # raise err
         i += 1
 
 
@@ -67,28 +84,22 @@ def open_db_connection():
     """
     db_addr = '192.168.1.106:3306'
     # TODO create user from here and not in database directly
-    db_user = 'asx'
-    db_pass = 'asx'
+    db_user = 'kodi'
+    db_pass = 'kodi'
     db_name = 'asx'
     # engine = db.create_engine('dialect+driver://user:pass@host:port/db')
     try:
-        #engine = db.create_engine('sqlite:///asx_db.sqlite')
+        # engine = db.create_engine('sqlite:///asx_db.sqlite')
         url = f"mysql+pymysql://{db_user}:{db_pass}@{db_addr}/{db_name}"
-        print(url)
         engine = db.create_engine(url, echo=False)
-        print('1')
         if not database_exists(engine.url):
-            print('2')
             create_database(engine.url)
-            print('3')
         connection = engine.connect()
-        print('4')
         metadata = db.MetaData()
         db.MetaData.reflect(metadata, bind=engine)
     except OperationalError as err:
         logging.error("Cannot connect to DB %s", err)
         raise err
-    print('5')
     return engine, connection, metadata
 
 
@@ -101,20 +112,19 @@ def create_tables(engine, connection, metadata):
     :returns:  Nil
     :raises: None
     """
-    print('a')
+
     # Check if Company table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'company'):
-        print('b')
         Table('company', metadata,
               Column('Id', Integer, primary_key=True, nullable=False),
               Column('name', String(100)),
               Column('symbol', String(5)),
               Column('group', String(100)),
               )
-        print('c')
+
         # Implement the creation
         metadata.create_all(engine)
-        print('d')
+
     # Check if Stock_Price table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'stock_price'):
         Table('stock_price', metadata,
@@ -180,7 +190,7 @@ def construct_url(ticker, s_date, e_date):
     # "https://au.finance.yahoo.com/quote/BHP/history?period1=1653045826&period2=1684581826&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true")
     # yfURL = "https://au.finance.yahoo.com/quote/" + ticker + "/history?period1=1653045826&period2=1684581826&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true"
     url = "https://query1.finance.yahoo.com/v7/finance/download/" + ticker + ".AX?period1=" + s_date + "&period2=" + e_date + "&interval=1d&events=history&includeAdjustedClose=true"
-    #print(url)
+    # print(url)
     return url
 
 

@@ -3,3 +3,4 @@ pandas
 urllib3
 pymysql
 sqlalchemy-utils
+requests
