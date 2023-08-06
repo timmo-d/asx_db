@@ -15,7 +15,7 @@ def main():
     """This function is the main function to run the program.
 
     :returns:  Nil
-    :raises: None
+    :raises: BaseException
     """
 
     # establish connection to database server
@@ -34,10 +34,11 @@ def main():
     # update stock_price table with latest data
     stock_price = metadata.tables['stock_price']
     i = 1
+    number_of_companies = len(df_companies)
+
     for row in df_companies.iterrows():
-        number_of_companies = len(df_companies)
         ticker = row[1][1]
-        # getlast record date
+        # getlast recorded date from db
         query = db.select(stock_price.columns.datestamp) \
             .where(stock_price.columns.symbol.ilike(ticker)) \
             .order_by(db.desc(stock_price.columns.datestamp))
@@ -50,29 +51,18 @@ def main():
 
         # get price data for that company between last date and yesterday from YFinance
         url = construct_url(str(ticker), str(last_date_epoch), str(current_date_epoch))
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) AppleWebKit/602.1.50 (KHTML, like Gecko) CriOS/56.0.2924.75 Mobile/14E5239e Safari/602.1 RuxitSynthetic/1.0 v1100525156 t4690183951324214268 smf=0',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
-            'Accept-Language': 'en-US,en;q=0.8',
-            'Accept-Encoding': 'none',
-            'Connection': 'keep-alive'}
 
         try:
-            response = requests.get(url, headers=headers)
-            print(str(response.status_code) + " | " + str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url)
-
-            if response.status_code == 200:
-                df_stock_prices = pd.read_csv(url, skiprows=1,
-                                              names=['datestamp', 'open', 'high', 'low', 'close', 'adjclose', 'volume',
-                                                     'symbol'])
-                df_stock_prices['symbol'] = ticker
-                df_stock_prices = df_stock_prices.reset_index(drop=True)
-                df_stock_prices.to_sql('stock_price', engine, if_exists='append', index=False)
-        except OperationalError as err:
+            print(str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url)
+            df_stock_prices = pd.read_csv(url, skiprows=1,
+                                          names=['datestamp', 'open', 'high', 'low', 'close', 'adjclose', 'volume',
+                                                 'symbol'])
+            df_stock_prices['symbol'] = ticker
+            df_stock_prices = df_stock_prices.reset_index(drop=True)
+            df_stock_prices.to_sql('stock_price', engine, if_exists='append', index=False)
+        except BaseException as err:
             logging.error("Failed to add %s to database %s", ticker, err)
-            print("Error downloading " + ticker)
-            # raise err
+            #raise err
         i += 1
 
 
