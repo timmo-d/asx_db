@@ -3,12 +3,13 @@ import time
 import logging
 import sqlalchemy as db
 import pandas as pd
-import io
-import requests
 
 from sqlalchemy import Table, Column, Integer, Date, String, Float
 from sqlalchemy.exc import OperationalError
 from sqlalchemy_utils import database_exists, create_database
+
+from logging import getLogger, Formatter
+import logging.handlers
 
 
 def main():
@@ -25,11 +26,15 @@ def main():
     create_tables(engine, connection, metadata)
 
     # get company list from Yahoo Finance
-    company_url = 'https://www.asx.com.au/asx/research/ASXListedCompanies.csv'
-    print("Getting companies on ASX.")
-    df_companies = pd.read_csv(company_url, skiprows=3, names=['name', 'symbol', 'group'])
-    df_companies.to_sql('company', engine, if_exists='replace', index=True)
-    # TODO remove obsolete pricing data from stock_price table
+    try:
+        company_url = 'https://www.asx.com.au/asx/research/ASXListedCompanies.csv'
+        print("Getting companies on ASX.")
+        df_companies = pd.read_csv(company_url, skiprows=3, names=['name', 'symbol', 'group'])
+        df_companies.to_sql('company', engine, if_exists='replace', index=True)
+        # TODO remove obsolete pricing data from stock_price table
+        logging.info("Successfully updated listed ASX companies.")
+    except OperationalError as err:
+        logging.warning("Unable to update company list. Error: ", err)
 
     # update stock_price table with latest data
     stock_price = metadata.tables['stock_price']
@@ -53,7 +58,9 @@ def main():
         url = construct_url(str(ticker), str(last_date_epoch), str(current_date_epoch))
 
         try:
-            print(str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url)
+            msg = str(i) + " of " + str(number_of_companies) + " >> Adding " + ticker + ": " + url
+            print(msg)
+            logging.info(msg)
             df_stock_prices = pd.read_csv(url, skiprows=1,
                                           names=['datestamp', 'open', 'high', 'low', 'close', 'adjclose', 'volume',
                                                  'symbol'])
@@ -87,8 +94,9 @@ def open_db_connection():
         connection = engine.connect()
         metadata = db.MetaData()
         db.MetaData.reflect(metadata, bind=engine)
+        logging.info("Successfully connected to DB at %s", url)
     except OperationalError as err:
-        logging.error("Cannot connect to DB %s", err)
+        logging.critical("Cannot connect to DB %s", err)
         raise err
     return engine, connection, metadata
 
@@ -113,7 +121,11 @@ def create_tables(engine, connection, metadata):
               )
 
         # Implement the creation
-        metadata.create_all(engine)
+        try:
+            metadata.create_all(engine)
+            logging.info("Successfully created 'Company' table.")
+        except OperationalError as err:
+            logging.warning("Unable to create 'Company' table. Error: %s", err)
 
     # Check if Stock_Price table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'stock_price'):
@@ -129,7 +141,11 @@ def create_tables(engine, connection, metadata):
               Column('symbol', String(5)),
               )
         # Implement the creation
-        metadata.create_all(engine)
+        try:
+            metadata.create_all(engine)
+            logging.info("Successfully created 'Stock Price' table.")
+        except OperationalError as err:
+            logging.warning("Unable to create 'Stock Price' table. Error: %s", err)
 
     # Check if Index table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'index'):
@@ -140,7 +156,11 @@ def create_tables(engine, connection, metadata):
               Column('last_date', Date),
               )
         # Implement the creation
-        metadata.create_all(engine)
+        try:
+            metadata.create_all(engine)
+            logging.info("Successfully created 'Index' table.")
+        except OperationalError as err:
+            logging.warning("Unable to create 'Index' table. Error: %s", err)
 
     # Check if Index Price table exists, if not, create it.
     if not engine.dialect.has_table(connection, 'index_price'):
@@ -156,7 +176,11 @@ def create_tables(engine, connection, metadata):
               Column('symbol', String(5)),
               )
         # Implement the creation
-        metadata.create_all(engine)
+        try:
+            metadata.create_all(engine)
+            logging.info("Successfully created 'Index Price' table.")
+        except OperationalError as err:
+            logging.warning("Unable to create 'Index Price' table. Error: %s", err)
 
 
 def construct_url(ticker, s_date, e_date):
@@ -184,6 +208,16 @@ def construct_url(ticker, s_date, e_date):
     return url
 
 
+def configure_logger():
+    LOG_FORMAT = f"%(levelname)s:%(filename)s:%(lineno)d - %(asctime)s - %(message)s"
+    logger = getLogger()
+    syslogHandler = logging.handlers.SysLogHandler(address=("192.168.1.106", 514))
+    logger.setLevel(logging.INFO)
+    syslogHandler.setFormatter(Formatter(LOG_FORMAT))
+    logger.addHandler(syslogHandler)
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    configure_logger()
     main()
