@@ -11,6 +11,8 @@ COPY README.md README.md
 RUN echo $PYTHONPATH
 # run crond as main process of container
 CMD ["cron", "-f"]
+RUN python src/main.py
+
 
 
 
